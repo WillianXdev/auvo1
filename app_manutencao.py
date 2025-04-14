@@ -89,7 +89,43 @@ def get_db_connection():
         cumprimento TEXT
     )
     ''')
+    conn.execute('''
+    CREATE TABLE IF NOT EXISTS ultima_atualizacao (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        data_hora TEXT
+    )
+    ''')
     return conn
+
+# Função para salvar a data e hora da última atualização
+def salvar_ultima_atualizacao():
+    conn = get_db_connection()
+    data_hora_atual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    
+    # Limpar tabela antes de inserir novo registro
+    conn.execute("DELETE FROM ultima_atualizacao")
+    
+    # Inserir nova data/hora
+    conn.execute(
+        "INSERT INTO ultima_atualizacao (data_hora) VALUES (?)",
+        (data_hora_atual,)
+    )
+    conn.commit()
+    conn.close()
+    return data_hora_atual
+
+# Função para obter a data e hora da última atualização
+def obter_ultima_atualizacao():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT data_hora FROM ultima_atualizacao ORDER BY id DESC LIMIT 1")
+    resultado = cursor.fetchone()
+    conn.close()
+    
+    if resultado:
+        return resultado[0]
+    else:
+        return "Nenhuma atualização registrada"
 
 # Função para salvar a planilha no banco de dados de acordo com o tipo
 def salvar_planilha(df, tipo_manutencao=TIPO_MANUTENCAO_MENSAL):
@@ -399,6 +435,9 @@ def processar_dados_manutencao(arquivo_mensal=None, arquivo_equipamentos=None, a
     
     # Se chegou até aqui, pelo menos temos os dados combinados
     if 'df_combinado' in locals() and df_combinado is not None:
+        # Atualizar a data e hora da última atualização
+        salvar_ultima_atualizacao()
+        
         # Adicionar status de manutenção para cada identificador
         for index, row in df_combinado.iterrows():
             identificador = str(row.get('Identificador', ''))
@@ -412,12 +451,17 @@ def processar_dados_manutencao(arquivo_mensal=None, arquivo_equipamentos=None, a
         if usar_armazenado:
             df_combinado = combinar_dados()
             if df_combinado is not None:
+                # Atualizar a data e hora da última atualização
+                salvar_ultima_atualizacao()
+                
                 # Adicionar status de manutenção para cada identificador
                 for index, row in df_combinado.iterrows():
                     identificador = str(row.get('Identificador', ''))
                     colaborador = str(row.get('Colaborador', ''))
                     cliente = str(row.get('Cliente', ''))
-                    df_combinado.at[index, 'Manutencao_Realizada'] = verificar_manutencao_realizada(identificador, colaborador, cliente)
+                    df_combinado.at[index, 'Manutencao_Realizada'] = verificar_manutencao_realizada(
+                        identificador, colaborador, cliente
+                    )
                 
                 return df_combinado
     
@@ -616,7 +660,10 @@ with st.sidebar:
                     df_combinado = combinar_dados()
                     
                     if df_combinado is not None:
-                        # Adicionar status de manutenção para cada identificador
+                        # Atualizar a data e hora da última atualização
+                        salvar_ultima_atualizacao()
+                        
+                        # Adicionar status de manutenção para cada identificador, filtrando pelo tipo
                         for index, row in df_combinado.iterrows():
                             identificador = str(row.get('Identificador', ''))
                             colaborador = str(row.get('Colaborador', ''))
@@ -629,17 +676,17 @@ with st.sidebar:
                         st.session_state['dados_carregados'] = df_combinado
                         st.session_state['tipo_manutencao_atual'] = ultimo_tipo_processado
                     else:
-                        st.error("Não foi possível carregar os dados armazenados. Faça primeiro a configuração inicial.")
+                        st.error("Não foi possível carregar os dados armazenados. Faça o upload das planilhas iniciais primeiro.")
                 elif not alguma_diaria_processada:
                     st.warning("Nenhuma planilha diária foi processada. Carregue pelo menos uma planilha (Mensal, Semestral ou Corretiva).")
     
-    # Opções de visualização
+    # Adicionar o botão de atualizar data e hora abaixo das tabs
     st.markdown("---")
-    st.subheader("Opções de Visualização")
-    show_by = st.radio(
-        "Ver manutenções por:",
-        ["Colaborador", "Cliente", "Identificador"]
-    )
+    st.subheader("Atualizar Data e Hora")
+    if st.button("Atualizar Data/Hora", key="atualizar_data_hora_sidebar"):
+        data_hora_atual = salvar_ultima_atualizacao()
+        st.success(f"Data e hora atualizadas: {data_hora_atual}")
+        st.rerun()  # Recarregar a página para mostrar a nova data/hora
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Instruções")
@@ -648,9 +695,30 @@ with st.sidebar:
     2. Na aba "Atualização Diária", carregue todas as planilhas diárias que deseja processar
     3. O sistema processará todas as planilhas simultaneamente
     4. Use os botões da área principal para selecionar o tipo de manutenção que deseja visualizar
-    5. ✅ Verde = Manutenção Realizada
-    6. ❌ Vermelho = Manutenção Pendente
+    5. Verde = Manutenção Realizada
+    6. Vermelho = Manutenção Pendente
     """)
+
+# Criar um container para a data e hora com estilo destacado
+data_hora_container = st.container()
+with data_hora_container:
+    # Usar colunas para organizar o layout
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        st.markdown("### Última atualização:")
+    with col2:
+        # Obter a data e hora da última atualização
+        ultima_atualizacao = obter_ultima_atualizacao()
+        # Usar markdown para destacar a informação
+        st.markdown(f"### *{ultima_atualizacao}*")
+
+# Opções de visualização
+st.markdown("---")
+st.subheader("Opções de Visualização")
+show_by = st.radio(
+    "Ver manutenções por:",
+    ["Colaborador", "Cliente", "Identificador"]
+)
 
 # Adicionar seleção de tipo de manutenção para visualização
 tipo_visualizacao = st.radio(
@@ -674,6 +742,9 @@ if st.button(f"Carregar Dados Atuais ({tipo_visualizacao})"):
         df_combinado = combinar_dados()
         
         if df_combinado is not None:
+            # Atualizar a data e hora da última atualização
+            salvar_ultima_atualizacao()
+            
             # Adicionar status de manutenção para cada identificador, filtrando pelo tipo
             for index, row in df_combinado.iterrows():
                 identificador = str(row.get('Identificador', ''))
@@ -820,6 +891,7 @@ if 'dados_carregados' in st.session_state:
                         for _, equip in equips.iterrows():
                             status_icon = "✅" if equip['Manutencao_Realizada'] else "❌"
                             st.markdown(f"{status_icon} **{equip['Identificador']}**")
+                            st.write(f"Colaborador responsável: {equip['Colaborador']}")
                             
                             # Adicionar mais informações dos equipamentos se disponíveis
                             # Verificar colunas que possam conter informações adicionais, excluindo colunas de fotos
@@ -1098,8 +1170,8 @@ else:
     2. O sistema verifica a coluna "CUMPRIMENTO DOS ITENS MENCIONADOS" com valor "Sim" para marcar manutenções realizadas
     
     ### Visualização
-    - O sistema mostrará ✅ verde para equipamentos com manutenção realizada
-    - O sistema mostrará ❌ vermelho para equipamentos com manutenção pendente
+    - O sistema mostrará Verde para equipamentos com manutenção realizada
+    - O sistema mostrará Vermelho para equipamentos com manutenção pendente
     """)
     
     # Mostrar exemplo de como os dados devem estar organizados
