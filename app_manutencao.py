@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 import sqlite3
 import json
+import pytz  # Importar pytz para lidar com fusos horários
 
 # Definir variáveis globais para colunas de fotos a excluir
 FOTO_COLUMNS = [
@@ -97,10 +98,26 @@ def get_db_connection():
     ''')
     return conn
 
+# Função para obter a data e hora atual no fuso horário de São Paulo
+def obter_data_hora_sao_paulo():
+    # Definir o fuso horário de São Paulo
+    fuso_horario_sp = pytz.timezone('America/Sao_Paulo')
+    
+    # Obter a data e hora atual no fuso horário UTC
+    data_hora_utc = datetime.now(pytz.UTC)
+    
+    # Converter para o fuso horário de São Paulo
+    data_hora_sp = data_hora_utc.astimezone(fuso_horario_sp)
+    
+    # Formatar a data e hora
+    return data_hora_sp.strftime('%d/%m/%Y %H:%M:%S')
+
 # Função para salvar a data e hora da última atualização
 def salvar_ultima_atualizacao():
     conn = get_db_connection()
-    data_hora_atual = datetime.now().strftime('%d/%m/%Y %H:%M:%S')
+    
+    # Obter data e hora no fuso horário de São Paulo
+    data_hora_atual = obter_data_hora_sao_paulo()
     
     # Limpar tabela antes de inserir novo registro
     conn.execute("DELETE FROM ultima_atualizacao")
