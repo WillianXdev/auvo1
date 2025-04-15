@@ -386,6 +386,35 @@ def verificar_manutencao_realizada(identificador, colaborador=None, cliente=None
 
 # Função para processar os dados das planilhas
 def processar_dados_manutencao(arquivo_mensal=None, arquivo_equipamentos=None, arquivo_diario=None, usar_armazenado=False):
+    try:
+        # Se usar_armazenado for True, carregar dados do banco de dados
+        if usar_armazenado:
+            # Obter planilha mensal mais recente
+            df_mensal = obter_planilha_mensal()
+            # Obter planilha de equipamentos mais recente
+            df_equipamentos = obter_equipamentos()
+            
+            if df_mensal is not None and df_equipamentos is not None:
+                # Combinar dados
+                df_combinado = combinar_dados()
+                
+                if df_combinado is not None:
+                    # Atualizar a data e hora da última atualização
+                    salvar_ultima_atualizacao()
+                    
+                    # Armazenar na sessão
+                    st.session_state['dados_carregados'] = df_combinado
+                    return df_combinado
+                else:
+                    st.error("Erro ao combinar os dados.")
+                    return None
+            else:
+                st.error("Não foi possível carregar os dados armazenados.")
+                return None
+    except Exception as e:
+        st.error(f"Erro ao processar dados: {str(e)}")
+        return None
+        
     # Processar planilha mensal e de equipamentos
     if usar_armazenado:
         df_combinado = combinar_dados()
@@ -494,6 +523,41 @@ with st.sidebar:
     with tab1:
         st.subheader("Configuração Inicial do Mês")
         st.write("Este passo é realizado apenas uma vez no início do mês")
+        
+        # Verificar se já existem dados no banco de dados
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Verificar planilha mensal
+        cursor.execute("SELECT COUNT(*) FROM planilha_mensal")
+        tem_mensal = cursor.fetchone()[0] > 0
+        
+        # Verificar planilha semestral
+        cursor.execute("SELECT COUNT(*) FROM planilha_semestral")
+        tem_semestral = cursor.fetchone()[0] > 0
+        
+        # Verificar planilha corretiva
+        cursor.execute("SELECT COUNT(*) FROM planilha_corretiva")
+        tem_corretiva = cursor.fetchone()[0] > 0
+        
+        # Verificar equipamentos
+        cursor.execute("SELECT COUNT(*) FROM equipamentos")
+        tem_equipamentos = cursor.fetchone()[0] > 0
+        
+        conn.close()
+        
+        # Mostrar status das planilhas carregadas
+        st.markdown("### Status das Planilhas")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"- Mensal: {'✅ Carregada' if tem_mensal else '❌ Não carregada'}")
+            st.markdown(f"- Semestral: {'✅ Carregada' if tem_semestral else '❌ Não carregada'}")
+        with col2:
+            st.markdown(f"- Corretiva: {'✅ Carregada' if tem_corretiva else '❌ Não carregada'}")
+            st.markdown(f"- Equipamentos: {'✅ Carregada' if tem_equipamentos else '❌ Não carregada'}")
+        
+        st.markdown("---")
+        st.write("Carregue novas planilhas apenas se precisar substituir as existentes:")
         
         # Definir inputs para todas as planilhas
         st.markdown("### Selecione todas as planilhas necessárias")
@@ -715,6 +779,29 @@ with st.sidebar:
     5. Verde = Manutenção Realizada
     6. Vermelho = Manutenção Pendente
     """)
+
+# Carregar dados automaticamente ao iniciar o aplicativo
+if 'dados_carregados' not in st.session_state:
+    # Verificar se existem dados no banco de dados
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Verificar se há dados nas tabelas
+    cursor.execute("SELECT COUNT(*) FROM planilha_mensal")
+    tem_mensal = cursor.fetchone()[0] > 0
+    
+    cursor.execute("SELECT COUNT(*) FROM equipamentos")
+    tem_equipamentos = cursor.fetchone()[0] > 0
+    
+    conn.close()
+    
+    # Se existirem dados, carregá-los automaticamente
+    if tem_mensal and tem_equipamentos:
+        with st.spinner("Carregando dados armazenados..."):
+            dados_processados = processar_dados_manutencao(usar_armazenado=True)
+            if dados_processados is not None:
+                st.session_state['dados_carregados'] = dados_processados
+                st.session_state['tipo_manutencao_atual'] = TIPO_MANUTENCAO_MENSAL
 
 # Criar um container para a data e hora com estilo destacado
 data_hora_container = st.container()
