@@ -24,6 +24,23 @@ def processar_dados(arquivo_mensal, arquivo_equipamentos):
         # Carregar dados
         df_mensal = pd.read_excel(arquivo_mensal)
         df_equipamentos = pd.read_excel(arquivo_equipamentos)
+        # --- Substituição direta dos nomes por setor ---
+        SETOR_MAP_EXATO = {
+            "Setor 3 GWSB e Vitor Hugo": ["Victor Hugo Nascimento Soares", "GWSB"],
+            "Setor 1 Paco Ruhan e LUKREFRIGERAÇÃO": ["Pako Ruhan", "LUKREFRIGERACAO"],
+            "Setor 5 RNCLIMATIZACAO e Robson": ["Robson Roque Bernardo", "RN CLIMATIZACAO"],
+            "Setor 4 ADS e Wando": ["Wanderley Souza da Silva", "ADS"],
+            "Setor 2 Renan e MVF": ["Renan de Souza Miranda", "MVF Climatizacao"],
+        }
+        def substituir_por_setor(colaborador):
+            for setor, nomes in SETOR_MAP_EXATO.items():
+                for nome in nomes:
+                    if nome.lower() in str(colaborador).lower():
+                        return setor
+            return colaborador
+        if 'Colaborador' in df_mensal.columns:
+            df_mensal['Colaborador'] = df_mensal['Colaborador'].apply(substituir_por_setor)
+        # ------------------------------------------------
         
         # Verificar se as colunas necessárias existem
         colunas_necessarias_mensal = ['Colaborador', 'Identificador', 'Cliente']
@@ -33,11 +50,27 @@ def processar_dados(arquivo_mensal, arquivo_equipamentos):
             if coluna not in df_mensal.columns:
                 st.error(f"Coluna '{coluna}' não encontrada na planilha mensal.")
                 return None, None
-                
         for coluna in colunas_necessarias_equipamentos:
             if coluna not in df_equipamentos.columns:
                 st.error(f"Coluna '{coluna}' não encontrada na planilha de equipamentos.")
                 return None, None
+        # --- Substituição direta dos nomes por setor ---
+        SETOR_MAP_EXATO = {
+            "Setor 3 GWSB e Vitor Hugo": ["Victor Hugo Nascimento Soares", "GWSB"],
+            "Setor 1 Paco Ruhan e LUKREFRIGERAÇÃO": ["Pako Ruhan", "LUKREFRIGERACAO"],
+            "Setor 5 RNCLIMATIZACAO e Robson": ["Robson Roque Bernardo", "RN CLIMATIZACAO"],
+            "Setor 4 ADS e Wando": ["Wanderley Souza da Silva", "ADS"],
+            "Setor 2 Renan e MVF": ["Renan de Souza Miranda", "MVF Climatizacao"],
+        }
+        def substituir_por_setor(colaborador):
+            for setor, nomes in SETOR_MAP_EXATO.items():
+                for nome in nomes:
+                    if nome.lower() in str(colaborador).lower():
+                        return setor
+            return colaborador
+        if 'Colaborador' in df_mensal.columns:
+            df_mensal['Colaborador'] = df_mensal['Colaborador'].apply(substituir_por_setor)
+        # ------------------------------------------------
         
         # Importar dados para o banco de dados
         sucesso = db.importar_dados_excel(arquivo_mensal, arquivo_equipamentos)
