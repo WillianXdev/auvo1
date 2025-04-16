@@ -427,6 +427,23 @@ def processar_dados_manutencao(arquivo_mensal=None, arquivo_equipamentos=None, a
             try:
                 df_mensal = pd.read_excel(arquivo_mensal)
                 df_equipamentos = pd.read_excel(arquivo_equipamentos)
+                # --- Substituição direta dos nomes por setor ---
+                SETOR_MAP_EXATO = {
+                    "Setor 3 GWSB e Vitor Hugo": ["Victor Hugo Nascimento Soares", "GWSB"],
+                    "Setor 1 Paco Ruhan e LUKREFRIGERAÇÃO": ["Pako Ruhan", "LUKREFRIGERACAO"],
+                    "Setor 5 RNCLIMATIZACAO e Robson": ["Robson Roque Bernardo", "RN CLIMATIZACAO"],
+                    "Setor 4 ADS e Wando": ["Wanderley Souza da Silva", "ADS"],
+                    "Setor 2 Renan e MVF": ["Renan de Souza Miranda", "MVF Climatizacao"],
+                }
+                def substituir_por_setor(colaborador):
+                    for setor, nomes in SETOR_MAP_EXATO.items():
+                        for nome in nomes:
+                            if nome.lower() in str(colaborador).lower():
+                                return setor
+                    return colaborador
+                if 'Colaborador' in df_mensal.columns:
+                    df_mensal['Colaborador'] = df_mensal['Colaborador'].apply(substituir_por_setor)
+                # ------------------------------------------------
                 
                 # Verificar colunas necessárias
                 if 'Identificador' not in df_mensal.columns:
@@ -473,6 +490,23 @@ def processar_dados_manutencao(arquivo_mensal=None, arquivo_equipamentos=None, a
     if arquivo_diario is not None:
         try:
             df_diario = pd.read_excel(arquivo_diario)
+            # --- Substituição direta dos nomes por setor ---
+            SETOR_MAP_EXATO = {
+                "Setor 3 GWSB e Vitor Hugo": ["Victor Hugo Nascimento Soares", "GWSB"],
+                "Setor 1 Paco Ruhan e LUKREFRIGERAÇÃO": ["Pako Ruhan", "LUKREFRIGERACAO"],
+                "Setor 5 RNCLIMATIZACAO e Robson": ["Robson Roque Bernardo", "RN CLIMATIZACAO"],
+                "Setor 4 ADS e Wando": ["Wanderley Souza da Silva", "ADS"],
+                "Setor 2 Renan e MVF": ["Renan de Souza Miranda", "MVF Climatizacao"],
+            }
+            def substituir_por_setor(colaborador):
+                for setor, nomes in SETOR_MAP_EXATO.items():
+                    for nome in nomes:
+                        if nome.lower() in str(colaborador).lower():
+                            return setor
+                return colaborador
+            if 'Colaborador' in df_diario.columns:
+                df_diario['Colaborador'] = df_diario['Colaborador'].apply(substituir_por_setor)
+            # ------------------------------------------------
             # Registrar as manutenções realizadas no banco de dados
             registrar_manutencao(df_diario)
         except Exception as e:
@@ -484,13 +518,29 @@ def processar_dados_manutencao(arquivo_mensal=None, arquivo_equipamentos=None, a
         # Atualizar a data e hora da última atualização
         salvar_ultima_atualizacao()
         
+        # --- Substituição direta dos nomes por setor ---
+        SETOR_MAP_EXATO = {
+            "Setor 3 GWSB e Vitor Hugo": ["Victor Hugo Nascimento Soares", "GWSB"],
+            "Setor 1 Paco Ruhan e LUKREFRIGERAÇÃO": ["Pako Ruhan", "LUKREFRIGERACAO"],
+            "Setor 5 RNCLIMATIZACAO e Robson": ["Robson Roque Bernardo", "RN CLIMATIZACAO"],
+            "Setor 4 ADS e Wando": ["Wanderley Souza da Silva", "ADS"],
+            "Setor 2 Renan e MVF": ["Renan de Souza Miranda", "MVF Climatizacao"],
+        }
+        def substituir_por_setor(colaborador):
+            for setor, nomes in SETOR_MAP_EXATO.items():
+                for nome in nomes:
+                    if nome.lower() in str(colaborador).lower():
+                        return setor
+            return colaborador
+        if 'Colaborador' in df_combinado.columns:
+            df_combinado['Colaborador'] = df_combinado['Colaborador'].apply(substituir_por_setor)
+        # ------------------------------------------------
         # Adicionar status de manutenção para cada identificador
         for index, row in df_combinado.iterrows():
             identificador = str(row.get('Identificador', ''))
             colaborador = str(row.get('Colaborador', ''))
             cliente = str(row.get('Cliente', ''))
             df_combinado.at[index, 'Manutencao_Realizada'] = verificar_manutencao_realizada(identificador, colaborador, cliente)
-        
         return df_combinado
     else:
         # Se não temos os dados combinados, tentar usar os dados armazenados
@@ -1019,11 +1069,28 @@ if 'dados_carregados' in st.session_state:
             st.subheader("Todos os Colaboradores")
             
             # Criar tabela com status de cada colaborador
-            for colaborador in sorted([str(c) for c in dados_manutencao['Colaborador'].unique() if c is not None and pd.notna(c)]):
-                df_colab = dados_manutencao[dados_manutencao['Colaborador'] == colaborador]
-                total = len(df_colab)
-                realizadas = df_colab['Manutencao_Realizada'].sum()
-                pendentes = total - realizadas
+            # --- Substituição direta dos nomes por setor antes da exibição ---
+            SETOR_MAP_EXATO = {
+                "Setor 3 GWSB e Vitor Hugo": ["Victor Hugo Nascimento Soares", "GWSB"],
+                "Setor 1 Paco Ruhan e LUKREFRIGERAÇÃO": ["Pako Ruhan", "LUKREFRIGERACAO"],
+                "Setor 5 RNCLIMATIZACAO e Robson": ["Robson Roque Bernardo", "RN CLIMATIZACAO"],
+                "Setor 4 ADS e Wando": ["Wanderley Souza da Silva", "ADS"],
+                "Setor 2 Renan e MVF": ["Renan de Souza Miranda", "MVF Climatizacao"],
+            }
+            def substituir_por_setor(colaborador):
+                for setor, nomes in SETOR_MAP_EXATO.items():
+                    for nome in nomes:
+                        if nome.lower() in str(colaborador).lower():
+                            return setor
+                return colaborador
+            if 'Colaborador' in dados_manutencao.columns:
+                dados_manutencao['Colaborador'] = dados_manutencao['Colaborador'].apply(substituir_por_setor)
+            # --------------------------------------------------------------
+            for colaborador in dados_manutencao['Colaborador'].unique():
+                dados_colab = dados_manutencao[dados_manutencao['Colaborador'] == colaborador]
+                total = len(dados_colab)
+                realizados = dados_colab['Manutencao_Realizada'].sum()
+                pendentes = total - realizados
                 
                 with st.container():
                     cols = st.columns([3, 1, 1, 1])
@@ -1032,13 +1099,14 @@ if 'dados_carregados' in st.session_state:
                     with cols[1]:
                         st.markdown(f"Total: {total}")
                     with cols[2]:
-                        st.markdown(f"✅ {int(realizadas)}")
+                        st.markdown(f"✅ {int(realizados)}")
                     with cols[3]:
                         st.markdown(f"❌ {int(pendentes)}")
                 
                 # Adicionar barra de progresso
+                progresso = int(realizados / total * 100) if total > 0 else 0
                 progresso = int(realizadas / total * 100) if total > 0 else 0
-                st.progress(progresso/100)
+                st.progress(min(progresso/100, 1.0))
                 st.markdown("---")
                 
     elif show_by == "Cliente":
